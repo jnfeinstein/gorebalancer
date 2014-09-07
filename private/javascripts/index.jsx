@@ -1,8 +1,15 @@
 /** @jsx React.DOM */
 
-var jQueryMixin = {
-  componentDidMount: function() {
-    this.$el = $(this.getDOMNode());
+var UpdateTotalMixin = {
+  getInitialState: function() {
+    return {
+      total: null
+    };
+  },
+  componentWillReceiveProps: function(nextProps) {
+    this.setState({
+      total: nextProps.total
+    });
   }
 };
 
@@ -25,21 +32,10 @@ var StockCollection = Backbone.Collection.extend({
 });
 
 var StockComponent = React.createBackboneClass({
-  getInitialState: function() {
-    return {
-      shouldRebalance: this.shouldRebalance(this.props.total)
-    }
-  },
-  componentWillReceiveProps: function(nextProps) {
-    this.setState({shouldRebalance: this.shouldRebalance(nextProps.total)});
-  },
+  mixins: [UpdateTotalMixin],
   render: function() {
-    var model = this.getModel();
-
-    var shouldRebalanceText = "";
-    if (_.isBoolean(this.state.shouldRebalance)) {
-      shouldRebalanceText = this.state.shouldRebalance ? "Yes" : "No";
-    }
+    var model = this.getModel(),
+        amount = this.amount();
 
     return (
       <tr>
@@ -48,7 +44,8 @@ var StockComponent = React.createBackboneClass({
         <td>$<input type="number" min="0.01" step="0.01" defaultValue={model.get('price')} data-field="price"  onChange={this.handleNumericInput} /></td>
         <td><input type="number" min="0.01" step="0.01" defaultValue={model.get('target')} data-field="target"  onChange={this.handlePercentInput} />%</td>
         <td><input type="number" min="0.01" step="0.01" defaultValue={model.get('margin')} data-field="margin"  onChange={this.handlePercentInput} />%</td>
-        <td className="stock-rebalance">{shouldRebalanceText}</td>
+        <td className="stock-action">{this.action()}</td>
+        <td className="stock-amount">{amount ? Math.floor(Math.abs(amount)) : ""}</td>
       </tr>
     );
   },
@@ -72,15 +69,33 @@ var StockComponent = React.createBackboneClass({
       this.handleInput(e, parseInt(val) / 100);
     }
   },
-  shouldRebalance: function(total) {
+  shouldRebalance: function() {
     var model = this.getModel(),
-        value = model.value();
+        value = model.value(),
+        total = this.state.total;
 
-    if (value) {
+    if (value && total) {
       var currentPercentage = model.value() / total,
       currentDifference = Math.abs(model.get('target') - currentPercentage);
-
       return currentDifference > model.get('margin');
+    }
+  },
+  action: function() {
+    var amount = this.amount();
+    if (_.isNumber(amount) && amount != 0) {
+      return amount > 0 ? "Buy" : "Sell";
+    } else {
+      return "None";
+    }
+  },
+  amount: function() {
+    var model = this.getModel(),
+        value = model.value(),
+        total = this.state.total;
+
+    if (value && total) {
+      var targetAmount = total * model.get('target');
+      return (targetAmount - value) / model.get('price');
     }
   }
 });
@@ -94,32 +109,42 @@ var StockListComponent = React.createBackboneClass({
     var stocks = collection.map(function(stock) {
       return <StockComponent key={stock.id || stock.cid} model={stock} total={total} />
     });
+
+    var thead = collection.length <= 0 ? null : (
+      <thead>
+        <tr>
+          <th>Ticker</th>
+          <th>Quantity</th>
+          <th>Price</th>
+          <th>Target</th>
+          <th>Margin</th>
+          <th>Action</th>
+          <th>Amount</th>
+        </tr>
+      </thead>
+    );
+
+    var tfoot = collection.length <= 0 ? null : (
+      <tfoot>
+        <tr>
+          <td />
+          <td />
+          <td />
+          <td>{totalTarget * 100}%</td>
+          <td />
+          <td />
+        </tr>
+      </tfoot>
+    );
+
     return (
       <div className="stock-container">
         <table className="stock-table">
-        <thead>
-          <tr>
-            <th>Ticker</th>
-            <th>Quantity</th>
-            <th>Price</th>
-            <th>Target</th>
-            <th>Margin</th>
-            <th>Rebalance?</th>
-          </tr>
-        </thead>
+        {thead}
         <tbody>
           {stocks}
         </tbody>
-        <tfoot>
-          <tr>
-            <td />
-            <td />
-            <td />
-            <td>{totalTarget * 100}%</td>
-            <td />
-            <td />
-          </tr>
-        </tfoot>
+        {tfoot}
         </table>
       </div>
     );
