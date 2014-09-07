@@ -4,16 +4,29 @@ module.exports = function(grunt) {
     pkg: grunt.file.readJSON('package.json'),
     uglify: {
       options: {
-        sourceMap: true
+        sourceMap: true,
+        sourceMapIncludeSources: true
       },
-      files: {
-        expand: true,     // Enable dynamic expansion.
-        cwd: 'private/javascripts',      // Src matches are relative to this path.
-        src: ['**/*.js'], // Actual pattern(s) to match.
-        dest: 'public/javascripts',   // Destination path prefix.
-        ext: '.min.js',   // Dest filepaths will have this extension.
-        extDot: 'first'   // Extensions in filenames begin after the first dot
+      js: {
+        files: [{
+          expand: true,
+          cwd: 'private/javascripts',
+          src: ['**/*.js'],
+          dest: 'public/javascripts',
+          ext: '.min.js',
+          extDot: 'first'
+        }]
       },
+      jsx: {
+        files: [{
+          expand: true,
+          cwd: 'tmp/javascripts',
+          src: ['**/*.js'],
+          dest: 'public/javascripts',
+          ext: '.min.js',
+          extDot: 'first'
+        }]
+      }
     },
     compass: {
       dist: {
@@ -29,11 +42,28 @@ module.exports = function(grunt) {
         tasks: ['compass']
       },
       javascripts: {
-        files: ['private/javascripts/**/*.js'],
+        files: ['private/javascripts/**/*.js', 'tmp/javascripts/**/*.js'],
         tasks: ['uglify']
+      },
+      jsx: {
+        files: ['private/javascripts/**/*.jsx'],
+        tasks: ['react']
+      }
+    },
+    react: {
+      single_file_output: {
+        files: [{
+          expand: true,
+          cwd: 'private/javascripts',
+          src: ['**/*.jsx'],
+          dest: 'tmp/javascripts',
+          ext: '.js',
+          extDot: 'first'
+        }]
       }
     },
     clean: [
+      'tmp',
       'public/javascripts/**/*.min.js',
       'public/javascripts/**/*.map',
       'public/stylesheets/**/*.css'
@@ -44,8 +74,9 @@ module.exports = function(grunt) {
   grunt.loadNpmTasks('grunt-contrib-compass');
   grunt.loadNpmTasks('grunt-contrib-watch');
   grunt.loadNpmTasks('grunt-contrib-clean');
+  grunt.loadNpmTasks('grunt-react');
 
-  grunt.registerTask('default', ['clean', 'uglify', 'compass']);
-  grunt.registerTask('heroku', ['clean', 'uglify', 'compass']);
+  grunt.registerTask('default', ['clean', 'react', 'uglify', 'compass']);
+  grunt.registerTask('heroku', 'default');
 
 };
