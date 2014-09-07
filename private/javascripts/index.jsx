@@ -181,12 +181,17 @@ var InterfaceComponent = React.createClass({
     }
   },
   render : function() {
+    /*
+    var controls = (
+      <div className="stock-controls">
+        <label>Minimum trade amount</label>
+        <span>$<input type="number" min="0.01" step="0.01" placeholder="none" data-field="minTradeAmount" onChange={this.handleNumericInput}></input></span>
+      </div>
+    );
+    */
+
     return (
       <div className="main-container">
-        <div className="stock-controls">
-          <label>Minimum trade amount</label>
-          <span>$<input type="number" min="0.01" step="0.01" placeholder="none" data-field="minTradeAmount" onChange={this.handleNumericInput}></input></span>
-        </div>
         <StockListComponent collection={this.state.stocks} minTradeAmount={this.state.minTradeAmount} />
         <div className="controls">
           <a href="javascript:;" className="btn" onClick={this.addBlankStock}>Add stock</a>
