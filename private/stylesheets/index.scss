@@ -1,0 +1,12 @@
+table.stock-table {
+  border-collapse: separate;
+  border-spacing: 10px 10px;
+
+  th{
+    text-align: center;
+  }
+
+  td.stock-rebalance {
+    text-align: center;
+  }
+}
