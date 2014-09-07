@@ -1,15 +1,46 @@
 /** @jsx React.DOM */
 
-var UpdateTotalMixin = {
-  getInitialState: function() {
-    return {
-      total: null
-    };
+var update = function(field, value) {
+  var u = {};
+  u[field] = value;
+  return u;
+};
+
+var UpdateStateFromPropMixin = function(propName) {
+  return {
+    getInitialState: function() {
+      return update(propName, null);
+    },
+    componentWillReceiveProps: function(nextProps) {
+      this.setState(update(propName, nextProps[propName]));
+    }
+  };
+};
+
+var InputMixin = {
+  handleInput: function(e, val) {
+    var $target = $(e.target);
+    var field = $target.data().field;
+    if (_.isUndefined(val)) {
+      val = $target.val();
+    }
+    if (this.getModel) {
+      this.getModel().set(field, val);
+    } else {
+      this.setState(update(field, val));
+    }
   },
-  componentWillReceiveProps: function(nextProps) {
-    this.setState({
-      total: nextProps.total
-    });
+  handleNumericInput: function(e) {
+    var val = $(e.target).val();
+    if (val) {
+      this.handleInput(e, parseInt(val));
+    }
+  },
+  handlePercentInput: function(e) {
+    var val = $(e.target).val();
+    if (val) {
+      this.handleInput(e, parseInt(val) / 100);
+    }
   }
 };
 
@@ -32,7 +63,7 @@ var StockCollection = Backbone.Collection.extend({
 });
 
 var StockComponent = React.createBackboneClass({
-  mixins: [UpdateTotalMixin],
+  mixins: [UpdateStateFromPropMixin('total'), UpdateStateFromPropMixin('minTradeAmount'), InputMixin],
   render: function() {
     var model = this.getModel(),
         amount = this.amount();
@@ -45,29 +76,13 @@ var StockComponent = React.createBackboneClass({
         <td><input type="number" min="0.01" step="0.01" defaultValue={model.get('target')} data-field="target"  onChange={this.handlePercentInput} />%</td>
         <td><input type="number" min="0.01" step="0.01" defaultValue={model.get('margin')} data-field="margin"  onChange={this.handlePercentInput} />%</td>
         <td className="stock-action">{this.action()}</td>
-        <td className="stock-amount">{amount ? Math.floor(Math.abs(amount)) : ""}</td>
+        <td className="stock-amount">{amount ? Math.floor(Math.abs(amount)) : "-"}</td>
+        <td><span className="stock-remove glyphicon glyphicon-remove" onClick={this.handleRemove} /></td>
       </tr>
     );
   },
-  handleInput: function(e, val) {
-    var $target = $(e.target);
-    var field = $target.data().field;
-    if (_.isUndefined(val)) {
-      val = $target.val();
-    }
-    this.getModel().set(field, val);
-  },
-  handleNumericInput: function(e) {
-    var val = $(e.target).val();
-    if (val) {
-      this.handleInput(e, parseInt(val));
-    }
-  },
-  handlePercentInput: function(e) {
-    var val = $(e.target).val();
-    if (val) {
-      this.handleInput(e, parseInt(val) / 100);
-    }
+  handleRemove: function() {
+    this.getModel().destroy();
   },
   shouldRebalance: function() {
     var model = this.getModel(),
@@ -91,11 +106,16 @@ var StockComponent = React.createBackboneClass({
   amount: function() {
     var model = this.getModel(),
         value = model.value(),
-        total = this.state.total;
+        total = this.state.total,
+        minTradeAmount = this.state.minTradeAmount;
 
     if (value && total) {
       var targetAmount = total * model.get('target');
-      return (targetAmount - value) / model.get('price');
+      var difference = targetAmount - value; 
+      if (_.isNumber(minTradeAmount) && Math.abs(difference) < minTradeAmount) {
+        return;
+      }
+      return difference / model.get('price');
     }
   }
 });
@@ -103,11 +123,12 @@ var StockComponent = React.createBackboneClass({
 var StockListComponent = React.createBackboneClass({
   mixins: [React.BackboneMixin({propName: "collection",renderOn: "change"})],
   render : function() {
+    var self = this;
     var collection = this.getCollection();
     var total = collection.reduce(function(memo, model){ return memo + model.value(); }, 0);
     var totalTarget = collection.reduce(function(memo, model){ return memo + model.get('target'); }, 0);
     var stocks = collection.map(function(stock) {
-      return <StockComponent key={stock.id || stock.cid} model={stock} total={total} />
+      return <StockComponent key={stock.id || stock.cid} model={stock} total={total} minTradeAmount={self.props.minTradeAmount} />
     });
 
     var thead = collection.length <= 0 ? null : (
@@ -118,8 +139,8 @@ var StockListComponent = React.createBackboneClass({
           <th>Price</th>
           <th>Target</th>
           <th>Margin</th>
-          <th>Action</th>
-          <th>Amount</th>
+          <th>Rebalance action</th>
+          <th>Rebalance quantity</th>
         </tr>
       </thead>
     );
@@ -152,15 +173,21 @@ var StockListComponent = React.createBackboneClass({
 });
 
 var InterfaceComponent = React.createClass({
+  mixins: [InputMixin],
   getInitialState: function() {
     return {
-      stocks: new StockCollection()
+      stocks: new StockCollection(),
+      minTradeAmount: null
     }
   },
   render : function() {
     return (
       <div className="main-container">
-        <StockListComponent collection={this.state.stocks} />
+        <div className="stock-controls">
+          <label>Minimum trade amount</label>
+          <span>$<input type="number" min="0.01" step="0.01" placeholder="none" data-field="minTradeAmount" onChange={this.handleNumericInput}></input></span>
+        </div>
+        <StockListComponent collection={this.state.stocks} minTradeAmount={this.state.minTradeAmount} />
         <div className="controls">
           <a href="javascript:;" className="btn" onClick={this.addBlankStock}>Add stock</a>
         </div>
